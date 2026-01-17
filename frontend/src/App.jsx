@@ -23,7 +23,8 @@ import {
   Copy,
   Check,
   Volume2,
-  VolumeX
+  VolumeX,
+  Settings
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -320,7 +321,7 @@ export default function App() {
         const response = await fetch(`${API_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: token },
-          body: JSON.stringify({ message: combinedMsg, mode, chatId: currentChatId, image: fileData })
+          body: JSON.stringify({ message: combinedMsg, mode, chatId: currentChatId, image: fileData, customRules })
         });
 
         // Streaming Logic
@@ -478,6 +479,28 @@ export default function App() {
         </div>
       )}
 
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2><Settings size={20} /> Brain Settings</h2>
+              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <label>Custom Instructions (System Rules)</label>
+              <textarea
+                placeholder='e.g., "Always speak in pirate style", "Be concise", "Explain like I am 5"'
+                value={customRules}
+                onChange={(e) => setCustomRules(e.target.value)}
+                rows={6}
+              />
+              <p className="hint">These rules apply to all new messages.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile/Toggle Button */}
       {!isSidebarOpen && (
         <button
@@ -557,6 +580,10 @@ export default function App() {
         <div className="sidebar-footer">
           {isProfileOpen && (
             <div className="profile-menu">
+              <button className="menu-item" onClick={() => { setIsSettingsOpen(true); setIsProfileOpen(false); }}>
+                <Settings size={16} />
+                <span>Custom Instructions</span>
+              </button>
               <button className="menu-item" onClick={logout}>
                 <LogOut size={16} />
                 <span>Log out</span>
