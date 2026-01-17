@@ -18,7 +18,8 @@ import {
   Lightbulb,
   Pencil,
   Paperclip,
-  X
+  X,
+  Mic
 } from "lucide-react";
 import "./App.css";
 import { API_URL } from "./config";
@@ -280,6 +281,47 @@ export default function App() {
 
   const themeColor = getThemeColor(mode);
 
+  // Voice Mode Logic
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+
+      recognitionRef.current.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        setMsg(prev => prev ? prev + " " + transcript : transcript);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+      setMsg(""); // Clear input when starting fresh voice command? Or keep? Let's keep empty or append.
+    }
+  };
+
   return (
     <div className="app-container">
       {/* Context Menu */}
@@ -463,8 +505,18 @@ export default function App() {
               value={msg}
               onKeyDown={(e) => e.key === "Enter" && send()}
               onChange={(e) => setMsg(e.target.value)}
-              placeholder={file ? "Ask about this file..." : `Message ${mode} assistant...`}
+              placeholder={isListening ? "Listening..." : (file ? "Ask about this file..." : `Message ${mode} assistant...`)}
             />
+            {/* Voice Button */}
+            <button
+              className="attach-btn"
+              onClick={toggleListening}
+              style={{ color: isListening ? "#ff4b4b" : "#aaa", marginRight: "8px" }}
+              title="Voice Input"
+            >
+              <Mic size={20} />
+            </button>
+
             <button
               className="send-btn"
               onClick={send}
