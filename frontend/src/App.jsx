@@ -21,7 +21,9 @@ import {
   X,
   Mic,
   Copy,
-  Check
+  Check,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -268,8 +270,10 @@ export default function App() {
         if (d.image) {
           imageUrl = d.image;
           aiText = "Here is your generated image:";
+          speak("I have generated an image for you.");
         } else {
           aiText = "Sorry, image generation failed.";
+          speak("Sorry, I could not generate the image.");
         }
       } else {
         const response = await fetch(`${API_URL}/chat`, {
