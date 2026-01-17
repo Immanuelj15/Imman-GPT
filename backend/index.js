@@ -67,20 +67,30 @@ app.post("/chat", async (req, res) => {
                     { role: "system", content: systemPrompt },
                     { role: "user", content: message }
                 ],
-                max_tokens: 500
+                max_tokens: 500,
+                stream: true // Enable streaming
             },
             {
                 headers: {
                     Authorization: `Bearer ${process.env.HF_TOKEN}`,
                     "Content-Type": "application/json"
-                }
+                },
+                responseType: "stream" // Axios Stream
             }
         );
-        res.json({ reply: r.data.choices[0].message.content });
+
+        // Header for SSE (Server-Sent Events)
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        // Pipe the HF stream directly to the client
+        r.data.pipe(res);
+
     } catch (e) {
         console.error("HF Inference Error:", e.response ? e.response.data : e.message);
-        const errorMessage = e.response?.data?.error?.message || e.response?.data?.error || e.message || "Unknown error";
-        res.json({ reply: `Error from AI service: ${errorMessage}` });
+        res.write(`data: ${JSON.stringify({ error: "High traffic. Try again." })}\n\n`);
+        res.end();
     }
 });
 

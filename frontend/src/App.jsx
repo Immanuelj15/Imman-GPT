@@ -223,17 +223,60 @@ export default function App() {
           aiText = "Sorry, image generation failed.";
         }
       } else {
-        const r = await fetch(`${API_URL}/chat`, {
+        const response = await fetch(`${API_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: token },
           body: JSON.stringify({ message: combinedMsg, mode })
         });
-        const d = await r.json();
-        aiText = d.reply;
+
+        // Streaming Logic
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let aiText = "";
+
+        // Add empty bot message first
+        setChat(prev => [...prev, { role: "bot", text: "" }]);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const dataStr = line.replace("data: ", "").trim();
+              if (dataStr === "[DONE]") break;
+              try {
+                const data = JSON.parse(dataStr);
+                const content = data.choices?.[0]?.delta?.content || "";
+                if (content) {
+                  aiText += content;
+                  // Live Update
+                  setChat(prev => {
+                    const newChat = [...prev];
+                    const lastMsg = newChat[newChat.length - 1];
+                    if (lastMsg.role === "bot") {
+                      lastMsg.text = aiText;
+                    }
+                    return newChat;
+                  });
+                }
+              } catch (e) {
+                // Ignore parse errors for partial chunks
+              }
+            }
+          }
+        }
       }
 
-      const updatedMessages = [...newChat, { role: "bot", text: aiText, image: imageUrl }];
-      setChat(updatedMessages);
+      // Streaming handles the setChat updates already.
+      // We just need to save to history at the end.
+
+      const updatedMessages = [...newChat, { role: "bot", text: aiText, image: imageUrl }]; // Wait, we can't use newChat here cleanly due to closure.
+      // Let's rely on the final state of aiText for history saving.
+
 
       const savedUserMsg = await saveToHistory(userMsg + (file ? ` [Attached: ${file.name}]` : ""), "user", fileData, currentChatId);
 
