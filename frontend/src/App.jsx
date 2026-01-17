@@ -89,6 +89,22 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, chatId: null });
+  const [isListening, setIsListening] = useState(false);
+  const [isTTSActive, setIsTTSActive] = useState(true);
+  const recognitionRef = useRef(null);
+
+  // TTS Function
+  const speak = (text) => {
+    if (!isTTSActive || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    // Prefer Google US English, fall back to first available
+    const googleVoice = voices.find(v => v.name.includes("Google US English")) || voices[0];
+    if (googleVoice) utterance.voice = googleVoice;
+    window.speechSynthesis.speak(utterance);
+  };
+
 
   // Load chat history list on mount
   useEffect(() => {
@@ -322,6 +338,8 @@ export default function App() {
             }
           }
         }
+        // Speak Result (Typewriter finished)
+        speak(aiText);
       }
 
       // Streaming handles the setChat updates already.
@@ -378,8 +396,6 @@ export default function App() {
   const themeColor = getThemeColor(mode);
 
   // Voice Mode Logic
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
 
   useEffect(() => {
     if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
@@ -621,6 +637,19 @@ export default function App() {
               title="Voice Input"
             >
               <Mic size={20} />
+            </button>
+            {/* TTS Toggle Button */}
+            <button
+              className="attach-btn"
+              onClick={() => {
+                const newState = !isTTSActive;
+                if (!newState) window.speechSynthesis.cancel();
+                setIsTTSActive(newState);
+              }}
+              style={{ color: isTTSActive ? themeColor : "#aaa", marginRight: "8px" }}
+              title={isTTSActive ? "Mute Voice" : "Enable Voice"}
+            >
+              {isTTSActive ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </button>
 
             <button
