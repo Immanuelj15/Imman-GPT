@@ -19,10 +19,59 @@ import {
   Pencil,
   Paperclip,
   X,
-  Mic
+  Mic,
+  Copy,
+  Check
 } from "lucide-react";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import "./App.css";
 import { API_URL } from "./config";
+
+
+// Custom Code Block Component
+const CodeBlock = ({ node, inline, className, children, ...props }) => {
+  const match = /language-(\w+)/.exec(className || '');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(String(children));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!inline && match) {
+    return (
+      <div className="rounded-md overflow-hidden my-2 border border-gray-700 bg-[#1e1e1e]">
+        <div className="flex justify-between items-center px-3 py-1.5 bg-[#2d2d2d] border-b border-gray-700">
+          <span className="text-xs text-gray-400 font-mono">{match[1]}</span>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+        <SyntaxHighlighter
+          style={vscDarkPlus}
+          language={match[1]}
+          PreTag="div"
+          customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
+          {...props}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      </div>
+    );
+  }
+
+  return (
+    <code className={`${className} bg-gray-800 px-1 py-0.5 rounded text-sm`} {...props}>
+      {children}
+    </code>
+  );
+};
 
 export default function App() {
   const { user, token, logout } = useAuth(); // Ensure token is available
@@ -515,10 +564,20 @@ export default function App() {
                     <div className="file-display">
                       {c.file.type === "image" && c.file.url && <img src={c.file.url} alt={c.file.name} />}
                       <p>Attached: {c.file.name}</p>
-                      {c.text && <ReactMarkdown remarkPlugins={[remarkGfm]}>{c.text}</ReactMarkdown>}
+                      {c.text && (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{ code: CodeBlock }}
+                        >
+                          {c.text}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   ) : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{ code: CodeBlock }}
+                    >
                       {c.text}
                     </ReactMarkdown>
                   )}
