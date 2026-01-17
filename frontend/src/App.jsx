@@ -291,6 +291,31 @@ export default function App() {
           aiText = "Sorry, image generation failed.";
           speak("Sorry, I could not generate the image.");
         }
+      }
+      // Image Editing Logic
+      else if (file && /(make|turn|change|edit|transform|add|remove|convert)/i.test(userMsg)) {
+        speak("Editing your image...");
+        setChat(prev => [...prev, { role: "bot", text: "Editing image..." }]);
+
+        const r = await fetch(`${API_URL}/edit-image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: token },
+          body: JSON.stringify({ image: fileData, prompt: userMsg })
+        });
+        const d = await r.json();
+
+        if (d.image) {
+          imageUrl = d.image;
+          aiText = "Here is your edited image:";
+          speak("I have applied your changes.");
+          // Remove "Editing image..." loading msg
+          setChat(prev => prev.slice(0, -1));
+        } else {
+          aiText = "Sorry, image editing failed.";
+          speak("Sorry, I could not edit the image.");
+          setChat(prev => prev.slice(0, -1));
+        }
+
       } else {
         const response = await fetch(`${API_URL}/chat`, {
           method: "POST",

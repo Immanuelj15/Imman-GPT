@@ -188,6 +188,44 @@ app.post("/image", async (req, res) => {
     }
 });
 
+// Image Editing (Pix2Pix)
+app.post("/edit-image", async (req, res) => {
+    const { image, prompt } = req.body; // image is local URL
+
+    try {
+        const filename = image.split("/uploads/")[1];
+        const filePath = path.join(__dirname, "uploads", filename);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(400).json({ error: "Image file not found." });
+        }
+
+        const fileData = fs.readFileSync(filePath);
+
+        const r = await axios.post(
+            "https://router.huggingface.co/hf-inference/models/timbrooks/instruct-pix2pix",
+            fileData,
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.HF_TOKEN}`,
+                    "Content-Type": "application/octet-stream",
+                    "x-use-cache": "false"
+                },
+                params: {
+                    inputs: prompt
+                },
+                responseType: "arraybuffer"
+            }
+        );
+        const base64 = Buffer.from(r.data).toString("base64");
+        res.json({ image: `data:image/png;base64,${base64}` });
+
+    } catch (e) {
+        console.error("Image Edit Error:", e.response ? e.response.data.toString() : e.message);
+        res.json({ error: "Image editing failed. Try a simpler instruction." });
+    }
+});
+
 // File Upload & Analyze Endpoint
 app.post("/upload", upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
