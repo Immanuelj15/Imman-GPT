@@ -10,7 +10,8 @@ import { fileURLToPath } from "url";
 import { createRequire } from "module"; // Import createRequire
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
-import Chat from "./models/Chat.js"; // Import Chat model
+import Chat from "./models/Chat.js";
+import { search } from "duck-duck-scrape"; // Import search
 
 
 const require = createRequire(import.meta.url); // Create require
@@ -58,9 +59,25 @@ const modes = {
 // Text Chat
 app.post("/chat", async (req, res) => {
     const { message, mode, chatId } = req.body;
-    const systemPrompt = modes[mode] || modes.normal;
+    let systemPrompt = modes[mode] || modes.normal;
 
     try {
+        // 0. Real-Time Search Check
+        const searchKeywords = /(price|news|latest|today|current|who is|what is|weather|stock|crypto|bitcoin|election|score)/i;
+        if (searchKeywords.test(message)) {
+            try {
+                const searchResults = await search(message, { safeSearch: "Strict" });
+                if (searchResults.results && searchResults.results.length > 0) {
+                    const topResults = searchResults.results.slice(0, 3).map(r =>
+                        `Title: ${r.title}\nSnippet: ${r.description}\nLink: ${r.url}`
+                    ).join("\n\n");
+
+                    systemPrompt += `\n\n[REAL-TIME SEARCH RESULTS]:\n${topResults}\n\n(Use these results to answer the user's question accurately. Citation style: [Domain Name])`;
+                }
+            } catch (searchErr) {
+                console.error("Search failed:", searchErr);
+            }
+        }
         // 1. Build Context from History
         let historyMessages = [];
         if (chatId) {
