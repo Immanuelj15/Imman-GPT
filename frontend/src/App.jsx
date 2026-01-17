@@ -21,6 +21,7 @@ import {
   X
 } from "lucide-react";
 import "./App.css";
+import { API_URL } from "./config";
 
 export default function App() {
   const { user, token, logout } = useAuth(); // Ensure token is available
@@ -51,7 +52,7 @@ export default function App() {
 
   async function fetchChats() {
     try {
-      const res = await fetch("http://localhost:5000/api/chats", {
+      const res = await fetch("${API_URL}/api/chats", {
         headers: { Authorization: token }
       });
       const data = await res.json();
@@ -63,7 +64,7 @@ export default function App() {
 
   async function loadChat(id) {
     try {
-      const res = await fetch(`http://localhost:5000/api/chats/${id}`, {
+      const res = await fetch(`${API_URL}/api/chats/${id}`, {
         headers: { Authorization: token }
       });
       const data = await res.json();
@@ -82,7 +83,7 @@ export default function App() {
     if (!window.confirm("Delete this chat?")) return;
 
     try {
-      await fetch(`http://localhost:5000/api/chats/${id}`, {
+      await fetch(`${API_URL}/api/chats/${id}`, {
         method: "DELETE",
         headers: { Authorization: token }
       });
@@ -104,7 +105,7 @@ export default function App() {
     if (!newTitle || !newTitle.trim()) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/chats/${id}`, {
+      const res = await fetch(`${API_URL}/api/chats/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: token },
         body: JSON.stringify({ title: newTitle.trim() })
@@ -172,7 +173,7 @@ export default function App() {
         const formData = new FormData();
         formData.append("file", file);
 
-        const uploadRes = await fetch("http://localhost:5000/upload", {
+        const uploadRes = await fetch("${API_URL}/upload", {
           method: "POST",
           body: formData
         });
@@ -208,7 +209,7 @@ export default function App() {
         // This prevents deleting keywords like "village" in "generate a village image"
         if (!prompt) prompt = userMsg;
 
-        const r = await fetch("http://localhost:5000/image", {
+        const r = await fetch("${API_URL}/image", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: token },
           body: JSON.stringify({ prompt })
@@ -221,7 +222,7 @@ export default function App() {
           aiText = "Sorry, image generation failed.";
         }
       } else {
-        const r = await fetch("http://localhost:5000/chat", {
+        const r = await fetch("${API_URL}/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: token },
           body: JSON.stringify({ message: combinedMsg, mode })
@@ -251,7 +252,7 @@ export default function App() {
 
   async function saveToHistory(text, role, image = null, forceChatId = null) {
     try {
-      const res = await fetch("http://localhost:5000/api/chats", {
+      const res = await fetch("${API_URL}/api/chats", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: token },
         body: JSON.stringify({
