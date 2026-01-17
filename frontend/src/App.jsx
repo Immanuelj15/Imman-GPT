@@ -226,7 +226,7 @@ export default function App() {
         const response = await fetch(`${API_URL}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: token },
-          body: JSON.stringify({ message: combinedMsg, mode })
+          body: JSON.stringify({ message: combinedMsg, mode, chatId: currentChatId })
         });
 
         // Streaming Logic

@@ -10,6 +10,8 @@ import { fileURLToPath } from "url";
 import { createRequire } from "module"; // Import createRequire
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
+import Chat from "./models/Chat.js"; // Import Chat model
+
 
 const require = createRequire(import.meta.url); // Create require
 const pdf = require("pdf-parse"); // Require pdf-parse
