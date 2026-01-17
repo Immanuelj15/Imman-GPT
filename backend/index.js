@@ -7,15 +7,14 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createRequire } from "module"; // Import createRequire
+import { createRequire } from "module";
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
 import Chat from "./models/Chat.js";
-import { search } from "duck-duck-scrape"; // Import search
+import { search } from "duck-duck-scrape";
 
-
-const require = createRequire(import.meta.url); // Create require
-const pdf = require("pdf-parse"); // Require pdf-parse
+const require = createRequire(import.meta.url);
+const pdf = require("pdf-parse");
 
 dotenv.config();
 
@@ -56,58 +55,87 @@ const modes = {
     normal: "You are Imman-GPT, a friendly and helpful AI assistant. Engage in natural conversation, answer questions, and assist with general tasks."
 };
 
-// Text Chat
+// Text & Vision Chat
 app.post("/chat", async (req, res) => {
-    const { message, mode, chatId } = req.body;
+    const { message, mode, chatId, image } = req.body;
     let systemPrompt = modes[mode] || modes.normal;
+    let model = "Qwen/Qwen2.5-Coder-32B-Instruct";
+    let hfMessages = [];
 
     try {
-        // 0. Real-Time Search Check
-        const searchKeywords = /(price|news|latest|today|current|who is|what is|weather|stock|crypto|bitcoin|election|score)/i;
-        if (searchKeywords.test(message)) {
-            try {
-                const searchResults = await search(message, { safeSearch: "Strict" });
-                if (searchResults.results && searchResults.results.length > 0) {
-                    const topResults = searchResults.results.slice(0, 3).map(r =>
-                        `Title: ${r.title}\nSnippet: ${r.description}\nLink: ${r.url}`
-                    ).join("\n\n");
+        // A. VISION MODE (If image is present)
+        if (image) {
+            model = "meta-llama/Llama-3.2-11B-Vision-Instruct";
 
-                    systemPrompt += `\n\n[REAL-TIME SEARCH RESULTS]:\n${topResults}\n\n(Use these results to answer the user's question accurately. Citation style: [Domain Name])`;
+            // Image URL format: http://localhost:5000/uploads/filename.ext
+            // We need to read the file from disk to convert to base64
+            const filename = image.split("/uploads/")[1];
+            if (filename) {
+                const filePath = path.join(__dirname, "uploads", filename);
+                if (fs.existsSync(filePath)) {
+                    const fileData = fs.readFileSync(filePath);
+                    const base64Image = `data:image/jpeg;base64,${fileData.toString("base64")}`;
+
+                    hfMessages = [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: message },
+                                { type: "image_url", image_url: { url: base64Image } }
+                            ]
+                        }
+                    ];
                 }
-            } catch (searchErr) {
-                console.error("Search failed:", searchErr);
-            }
-        }
-        // 1. Build Context from History
-        let historyMessages = [];
-        if (chatId) {
-            try {
-                const chatDoc = await Chat.findById(chatId);
-                if (chatDoc && chatDoc.messages) {
-                    // Take last 10 messages to avoid token overflow
-                    const lastMessages = chatDoc.messages.slice(-10);
-                    historyMessages = lastMessages.map(m => ({
-                        role: m.role === "bot" ? "assistant" : "user",
-                        content: m.text
-                    }));
-                }
-            } catch (err) {
-                console.error("Error fetching chat history:", err);
             }
         }
 
-        // 2. Construct Full Prompt
-        const fullMessages = [
-            { role: "system", content: systemPrompt },
-            ...historyMessages,
-            { role: "user", content: message }
-        ];
+        // B. STANDARD TEXT MODE (If no image or image failed)
+        if (hfMessages.length === 0) {
+            // 0. Real-Time Search Check
+            const searchKeywords = /(price|news|latest|today|current|who is|what is|weather|stock|crypto|bitcoin|election|score)/i;
+            if (searchKeywords.test(message)) {
+                try {
+                    const searchResults = await search(message, { safeSearch: "Strict" });
+                    if (searchResults.results && searchResults.results.length > 0) {
+                        const topResults = searchResults.results.slice(0, 3).map(r =>
+                            `Title: ${r.title}\nSnippet: ${r.description}\nLink: ${r.url}`
+                        ).join("\n\n");
+
+                        systemPrompt += `\n\n[REAL-TIME SEARCH RESULTS]:\n${topResults}\n\n(Use these results to answer accurately. Citation style: [Domain Name])`;
+                    }
+                } catch (e) {
+                    console.error("Search failed");
+                }
+            }
+
+            // 1. Build Context from History
+            let historyMessages = [];
+            if (chatId) {
+                try {
+                    const chatDoc = await Chat.findById(chatId);
+                    if (chatDoc && chatDoc.messages) {
+                        const lastMessages = chatDoc.messages.slice(-10);
+                        historyMessages = lastMessages.map(m => ({
+                            role: m.role === "bot" ? "assistant" : "user",
+                            content: m.text
+                        }));
+                    }
+                } catch (err) { }
+            }
+
+            // 2. Construct Full Prompt
+            hfMessages = [
+                { role: "system", content: systemPrompt },
+                ...historyMessages,
+                { role: "user", content: message }
+            ];
+        }
 
         const r = await axios.post(
             "https://router.huggingface.co/v1/chat/completions",
             {
-                model: "Qwen/Qwen2.5-Coder-32B-Instruct",
-                messages: fullMessages,
+                model: model,
+                messages: hfMessages,
                 max_tokens: 1000,
                 stream: true
             },
@@ -128,7 +156,8 @@ app.post("/chat", async (req, res) => {
 
     } catch (e) {
         console.error("HF Inference Error:", e.response ? e.response.data : e.message);
-        res.write(`data: ${JSON.stringify({ error: "High traffic. Try again." })}\n\n`);
+        const errData = { error: "Service busy or Vision not supported. Try text only." };
+        res.write(`data: ${JSON.stringify(errData)}\n\n`);
         res.end();
     }
 });
@@ -136,7 +165,6 @@ app.post("/chat", async (req, res) => {
 // Image Generation
 app.post("/image", async (req, res) => {
     const { prompt } = req.body;
-    // FLUX.1 performs best with natural descriptions, but we'll add minimal quality boosters
     const enhancedPrompt = `${prompt}, high quality, realistic`;
 
     try {
