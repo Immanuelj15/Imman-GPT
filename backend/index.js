@@ -57,36 +57,56 @@ const modes = {
 
 // Text Chat
 app.post("/chat", async (req, res) => {
-    const { message, mode } = req.body;
+    const { message, mode, chatId } = req.body;
     const systemPrompt = modes[mode] || modes.normal;
 
     try {
+        // 1. Build Context from History
+        let historyMessages = [];
+        if (chatId) {
+            try {
+                const chatDoc = await Chat.findById(chatId);
+                if (chatDoc && chatDoc.messages) {
+                    // Take last 10 messages to avoid token overflow
+                    const lastMessages = chatDoc.messages.slice(-10);
+                    historyMessages = lastMessages.map(m => ({
+                        role: m.role === "bot" ? "assistant" : "user",
+                        content: m.text
+                    }));
+                }
+            } catch (err) {
+                console.error("Error fetching chat history:", err);
+            }
+        }
+
+        // 2. Construct Full Prompt
+        const fullMessages = [
+            { role: "system", content: systemPrompt },
+            ...historyMessages,
+            { role: "user", content: message }
+        ];
+
         const r = await axios.post(
             "https://router.huggingface.co/v1/chat/completions",
             {
                 model: "Qwen/Qwen2.5-Coder-32B-Instruct",
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: message }
-                ],
-                max_tokens: 500,
-                stream: true // Enable streaming
+                messages: fullMessages,
+                max_tokens: 1000,
+                stream: true
             },
             {
                 headers: {
                     Authorization: `Bearer ${process.env.HF_TOKEN}`,
                     "Content-Type": "application/json"
                 },
-                responseType: "stream" // Axios Stream
+                responseType: "stream"
             }
         );
 
-        // Header for SSE (Server-Sent Events)
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
 
-        // Pipe the HF stream directly to the client
         r.data.pipe(res);
 
     } catch (e) {
