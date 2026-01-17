@@ -57,8 +57,12 @@ const modes = {
 
 // Text & Vision Chat
 app.post("/chat", async (req, res) => {
-    const { message, mode, chatId, image } = req.body;
+    const { message, mode, chatId, image, customRules } = req.body;
     let systemPrompt = modes[mode] || modes.normal;
+    // Apply Custom Rules if present
+    if (customRules) {
+        systemPrompt += `\n\n[USER CUSTOM INSTRUCTIONS]:\n${customRules}`;
+    }
     let model = "Qwen/Qwen2.5-Coder-32B-Instruct";
     let hfMessages = [];
 
