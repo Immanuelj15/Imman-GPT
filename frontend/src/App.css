@@ -532,87 +532,6 @@ body {
   margin-bottom: 0.5rem;
 }
 
-.file-display p {
-  font-size: 0.8rem;
-  color: #aaa;
-  margin: 0;
-}
-
-/* Authentication Pages */
-.auth-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  width: 100vw;
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.auth-box {
-  background-color: var(--bg-secondary);
-  padding: 2.5rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  max-width: 400px;
-  text-align: center;
-}
-
-.auth-box h2 {
-  margin-bottom: 2rem;
-  font-size: 1.75rem;
-  font-weight: 600;
-}
-
-.auth-input {
-  width: 100%;
-  padding: 0.875rem;
-  margin-bottom: 1rem;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  font-size: 1rem;
-}
-
-.auth-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.auth-btn {
-  width: 100%;
-  padding: 0.875rem;
-  border-radius: 6px;
-  border: none;
-  background: var(--accent-gradient);
-  color: white;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.auth-btn:hover {
-  opacity: 0.9;
-}
-
-.auth-link {
-  margin-top: 1.5rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.auth-link a {
-  color: var(--accent-primary);
-  text-decoration: none;
-}
-
-.auth-link a:hover {
-  text-decoration: underline;
-}
-
 .auth-error {
   color: #ff6b6b;
   margin-bottom: 1rem;
@@ -674,26 +593,69 @@ body {
   margin-bottom: 0.5rem;
 }
 
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
+/* Mobile & Tablet Responsiveness */
+@media (max-width: 1024px) {
+
+  /* Tablet Adjustments */
   .sidebar {
+    width: 260px;
+    /* Keep standard width even on tablet overlay */
     position: absolute;
     height: 100%;
     z-index: 50;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5);
+    background-color: #171717;
+    /* Ensure opaque background */
   }
 
+  /* When closed on mobile/tab, it should be fully hidden */
   .sidebar.closed {
     width: 0;
     border: none;
+    transform: translateX(-100%);
+    /* Smooth slide out */
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Fixed Toggle Button (Hamburger) */
+  .sidebar-toggle.fixed {
+    top: 12px;
+    left: 12px;
+    background-color: #2f2f2f;
+    /* More visible background */
+    padding: 8px;
+    border-radius: 8px;
+    z-index: 40;
+    /* Behind sidebar when open, but above chat */
+  }
+}
+
+@media (max-width: 768px) {
+
+  /* Mobile Specifics */
+  .sidebar-header {
+    padding: 1rem;
+    /* Slightly larger touch targets */
+  }
+
+  .nav-item.new-chat {
+    background-color: #212121;
+    /* clearer button area */
   }
 
   .app-container {
     position: relative;
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
   }
 
   .messages-container {
     padding: 1rem 0.5rem;
+    padding-bottom: 120px;
+    /* More space for input area on mobile */
   }
 
   .message {
@@ -701,12 +663,23 @@ body {
   }
 
   .message-content {
-    max-width: 90%;
+    max-width: 95%;
+    /* Use almost full width */
     font-size: 0.95rem;
   }
 
   .auth-box {
     padding: 1.5rem;
     margin: 1rem;
+    width: 90%;
+  }
+
+  /* Input Area adjustments */
+  .input-area {
+    padding: 0 0.5rem 1rem 0.5rem;
+  }
+
+  .input-container {
+    padding: 0.5rem;
   }
 }
