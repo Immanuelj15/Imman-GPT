@@ -4,7 +4,7 @@ dotenv.config();
 
 const token = process.env.HF_TOKEN;
 // URL from index.js
-const url = "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct";
+const url = "https://router.huggingface.co/v1/chat/completions";
 
 console.log("Token:", token ? "Exists (" + token.substring(0, 5) + "...)" : "Missing");
 
@@ -13,7 +13,12 @@ async function test() {
         console.log("Sending request to:", url);
         const r = await axios.post(
             url,
-            { inputs: "Hello" },
+            {
+                model: "Qwen/Qwen2.5-Coder-32B-Instruct",
+                messages: [{ role: "user", content: "Hello" }],
+                max_tokens: 10,
+                stream: false
+            },
             {
                 headers: {
                     Authorization: `Bearer ${token}`,

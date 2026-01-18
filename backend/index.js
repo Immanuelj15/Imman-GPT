@@ -96,15 +96,17 @@ app.post("/chat", async (req, res) => {
 
         // B. STANDARD TEXT MODE (If no image or image failed)
         if (hfMessages.length === 0) {
-            // 0. Real-Time Search Check
+            // 0. Real-Time Search Check (TEMPORARILY DISABLED DUE TO IP BLOCK)
+            /*
             const searchKeywords = /(price|news|latest|today|current|who is|what is|weather|stock|crypto|bitcoin|election|score)/i;
             if (searchKeywords.test(message)) {
                 console.log("Search Intent Detected for:", message);
                 try {
                     console.log("Starting Web Search...");
-                    const searchResults = await search(message, { safeSearch: "Strict" });
+                    // const searchResults = await search(message, { safeSearch: SafeSearchType.STRICT });
+                     const searchResults = await search(message); // Retrying without strict
                     console.log("Web Search Completed. Results Found:", searchResults?.results?.length);
-
+                    
                     if (searchResults.results && searchResults.results.length > 0) {
                         const topResults = searchResults.results.slice(0, 3).map(r =>
                             `Title: ${r.title}\nSnippet: ${r.description}\nLink: ${r.url}`
@@ -117,6 +119,7 @@ app.post("/chat", async (req, res) => {
                     console.error("Search failed:", e.message);
                 }
             }
+            */
 
             // 1. Build Context from History
             let historyMessages = [];
