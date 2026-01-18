@@ -595,10 +595,10 @@ export default function App() {
             onClick={() => setIsProfileOpen(!isProfileOpen)}
           >
             <div className="user-avatar-sm">
-              {user ? user.username.charAt(0).toUpperCase() : <User size={16} />}
+              {user && user.username ? user.username.charAt(0).toUpperCase() : <User size={16} />}
             </div>
             <div className="user-info">
-              <span className="user-name">{user ? user.username : "User"}</span>
+              <span className="user-name">{user && user.username ? user.username : "User"}</span>
               <span className="user-plan">Free Plan</span>
             </div>
           </button>
