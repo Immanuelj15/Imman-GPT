@@ -99,17 +99,22 @@ app.post("/chat", async (req, res) => {
             // 0. Real-Time Search Check
             const searchKeywords = /(price|news|latest|today|current|who is|what is|weather|stock|crypto|bitcoin|election|score)/i;
             if (searchKeywords.test(message)) {
+                console.log("Search Intent Detected for:", message);
                 try {
+                    console.log("Starting Web Search...");
                     const searchResults = await search(message, { safeSearch: "Strict" });
+                    console.log("Web Search Completed. Results Found:", searchResults?.results?.length);
+
                     if (searchResults.results && searchResults.results.length > 0) {
                         const topResults = searchResults.results.slice(0, 3).map(r =>
                             `Title: ${r.title}\nSnippet: ${r.description}\nLink: ${r.url}`
                         ).join("\n\n");
 
                         systemPrompt += `\n\n[REAL-TIME SEARCH RESULTS]:\n${topResults}\n\n(Use these results to answer accurately. Citation style: [Domain Name])`;
+                        console.log("Search Context Injected.");
                     }
                 } catch (e) {
-                    console.error("Search failed");
+                    console.error("Search failed:", e.message);
                 }
             }
 
