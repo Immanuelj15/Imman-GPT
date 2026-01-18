@@ -96,7 +96,14 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, chatId: null });
   const [isListening, setIsListening] = useState(false);
   const [isTTSActive, setIsTTSActive] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [customRules, setCustomRules] = useState(localStorage.getItem("imman_custom_rules") || "");
   const recognitionRef = useRef(null);
+
+  // Save rules
+  useEffect(() => {
+    localStorage.setItem("imman_custom_rules", customRules);
+  }, [customRules]);
 
   // TTS Function
   const speak = (text) => {
