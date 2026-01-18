@@ -43,30 +43,34 @@ const CodeBlock = ({ node, inline, className, children, ...props }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!inline && match) {
-    return (
-      <div className="rounded-md overflow-hidden my-2 border border-gray-700 bg-[#1e1e1e]">
-        <div className="flex justify-between items-center px-3 py-1.5 bg-[#2d2d2d] border-b border-gray-700">
-          <span className="text-xs text-gray-400 font-mono">{match[1]}</span>
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+  if (!inline && match && SyntaxHighlighter) {
+    try {
+      return (
+        <div className="rounded-md overflow-hidden my-2 border border-gray-700 bg-[#1e1e1e]">
+          <div className="flex justify-between items-center px-3 py-1.5 bg-[#2d2d2d] border-b border-gray-700">
+            <span className="text-xs text-gray-400 font-mono">{match[1]}</span>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+            >
+              {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+          <SyntaxHighlighter
+            style={vscDarkPlus}
+            language={match[1]}
+            PreTag="div"
+            customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
+            {...props}
           >
-            {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
-            {copied ? "Copied!" : "Copy"}
-          </button>
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
         </div>
-        <SyntaxHighlighter
-          style={vscDarkPlus}
-          language={match[1]}
-          PreTag="div"
-          customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
-          {...props}
-        >
-          {String(children).replace(/\n$/, '')}
-        </SyntaxHighlighter>
-      </div>
-    );
+      );
+    } catch (e) {
+      console.error("SyntaxHighlighter Error:", e);
+    }
   }
 
   return (
@@ -137,7 +141,7 @@ export default function App() {
         headers: { Authorization: token }
       });
       const data = await res.json();
-      setChat(data.messages);
+      setChat(data.messages || []);
       setCurrentChatId(id);
     } catch (e) {
       console.error("Failed to load chat");
