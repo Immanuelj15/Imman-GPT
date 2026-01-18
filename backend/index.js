@@ -57,6 +57,7 @@ const modes = {
 
 // Text & Vision Chat
 app.post("/chat", async (req, res) => {
+    console.log("Received /chat request:", req.body);
     const { message, mode, chatId, image, customRules } = req.body;
     let systemPrompt = modes[mode] || modes.normal;
     // Apply Custom Rules if present
