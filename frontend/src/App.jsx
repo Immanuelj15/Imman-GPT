@@ -335,6 +335,8 @@ export default function App() {
           body: JSON.stringify({ message: combinedMsg, mode, chatId: currentChatId, image: fileData, customRules })
         });
 
+        if (!response.ok) throw new Error("Backend connection failed (" + response.status + ")");
+
         // Streaming Logic
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -356,6 +358,11 @@ export default function App() {
               if (dataStr === "[DONE]") break;
               try {
                 const data = JSON.parse(dataStr);
+                // Handle potential error messages from backend
+                if (data.error) {
+                  aiText = data.error;
+                  break;
+                }
                 const content = data.choices?.[0]?.delta?.content || "";
                 if (content) {
                   aiText += content;
@@ -375,6 +382,17 @@ export default function App() {
             }
           }
         }
+
+        // If stream finished but empty (fallback)
+        if (!aiText) {
+          setChat(prev => {
+            const newChat = [...prev];
+            const lastMsg = newChat[newChat.length - 1];
+            if (lastMsg.role === "bot") lastMsg.text = "Error: No response from AI.";
+            return newChat;
+          });
+        }
+
         // Speak Result (Typewriter finished)
         speak(aiText);
       }
@@ -397,338 +415,349 @@ export default function App() {
 
     } catch (e) {
       console.error(e);
-      setChat((c) => [...c, { role: "bot", text: "Error: Could not connect to backend." }]);
-      setIsUploading(false);
-    }
-  }
-
-  async function saveToHistory(text, role, image = null, forceChatId = null) {
-    try {
-      const res = await fetch(`${API_URL}/api/chats`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: token },
-        body: JSON.stringify({
-          chatId: forceChatId,
-          role,
-          text,
-          image
-        })
-      });
-      return await res.json();
-    } catch (e) {
-      console.error("Failed to save chat");
-      return {};
-    }
-  }
-
-  const getThemeColor = (m) => {
-    switch (m) {
-      case "coding": return "#2563eb";
-      case "idea": return "#eab308";
-      case "placement": return "#9333ea";
-      default: return "#10a37f";
-    }
-  };
-
-  const themeColor = getThemeColor(mode);
-
-  // Voice Mode Logic
-
-  useEffect(() => {
-    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-
-      recognitionRef.current.onresult = (event) => {
-        let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+      // Update the hanging "empty" message to show error
+      setChat((prev) => {
+        const newChat = [...prev];
+        const lastMsg = newChat[newChat.length - 1];
+        // Only update if it's the pending bot message
+        if (lastMsg && lastMsg.role === "bot" && lastMsg.text === "") {
+          lastMsg.text = "Error: Connection Failed. Check Vercel Logs/Mixed Content.";
+        } else {
+          return [...prev, { role: "bot", text: "Error: Connection Failed." }];
         }
-        setMsg(prev => prev ? prev + " " + transcript : transcript);
-      };
+        return newChat;
+      });
+    } setIsUploading(false);
+  }
+}
 
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-      };
-    }
-  }, []);
+async function saveToHistory(text, role, image = null, forceChatId = null) {
+  try {
+    const res = await fetch(`${API_URL}/api/chats`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({
+        chatId: forceChatId,
+        role,
+        text,
+        image
+      })
+    });
+    return await res.json();
+  } catch (e) {
+    console.error("Failed to save chat");
+    return {};
+  }
+}
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert("Voice input is not supported in this browser.");
-      return;
-    }
+const getThemeColor = (m) => {
+  switch (m) {
+    case "coding": return "#2563eb";
+    case "idea": return "#eab308";
+    case "placement": return "#9333ea";
+    default: return "#10a37f";
+  }
+};
 
-    if (isListening) {
-      recognitionRef.current.stop();
+const themeColor = getThemeColor(mode);
+
+// Voice Mode Logic
+
+useEffect(() => {
+  if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+
+    recognitionRef.current.onresult = (event) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setMsg(prev => prev ? prev + " " + transcript : transcript);
+    };
+
+    recognitionRef.current.onend = () => {
       setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
-      setMsg(""); // Clear input when starting fresh voice command? Or keep? Let's keep empty or append.
-    }
-  };
+    };
+  }
+}, []);
 
-  return (
-    <div className="app-container">
-      {/* Context Menu */}
-      {contextMenu.visible && (
-        <div
-          className="context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-        >
-          <button className="context-item" onClick={renameChat}>
-            <Pencil size={16} />
-            <span>Rename</span>
-          </button>
-          <button className="context-item delete" onClick={deleteChat}>
-            <Trash2 size={16} />
-            <span>Delete Chat</span>
-          </button>
-        </div>
-      )}
+const toggleListening = () => {
+  if (!recognitionRef.current) {
+    alert("Voice input is not supported in this browser.");
+    return;
+  }
 
-      {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2><Settings size={20} /> Brain Settings</h2>
-              <button className="close-btn" onClick={() => setIsSettingsOpen(false)}><X size={20} /></button>
-            </div>
-            <div className="modal-body">
-              <label>Custom Instructions (System Rules)</label>
-              <textarea
-                placeholder='e.g., "Always speak in pirate style", "Be concise", "Explain like I am 5"'
-                value={customRules}
-                onChange={(e) => setCustomRules(e.target.value)}
-                rows={6}
-              />
-              <p className="hint">These rules apply to all new messages.</p>
-            </div>
-          </div>
-        </div>
-      )}
+  if (isListening) {
+    recognitionRef.current.stop();
+    setIsListening(false);
+  } else {
+    recognitionRef.current.start();
+    setIsListening(true);
+    setMsg(""); // Clear input when starting fresh voice command? Or keep? Let's keep empty or append.
+  }
+};
 
-      {/* Mobile/Toggle Button */}
-      {!isSidebarOpen && (
-        <button
-          className="sidebar-toggle fixed"
-          onClick={() => setIsSidebarOpen(true)}
-          title="Open Sidebar"
-        >
-          <PanelLeftOpen size={20} />
+return (
+  <div className="app-container">
+    {/* Context Menu */}
+    {contextMenu.visible && (
+      <div
+        className="context-menu"
+        style={{ top: contextMenu.y, left: contextMenu.x }}
+      >
+        <button className="context-item" onClick={renameChat}>
+          <Pencil size={16} />
+          <span>Rename</span>
         </button>
-      )}
+        <button className="context-item delete" onClick={deleteChat}>
+          <Trash2 size={16} />
+          <span>Delete Chat</span>
+        </button>
+      </div>
+    )}
 
-      {/* Sidebar */}
-      <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-        <div className="sidebar-header">
-          <button className="nav-item new-chat" onClick={startNewChat}>
-            <MessageSquarePlus size={18} />
-            <span>New chat</span>
-          </button>
-          <button
-            className="sidebar-toggle"
-            onClick={() => setIsSidebarOpen(false)}
-            title="Close Sidebar"
-          >
-            <PanelLeftClose size={20} />
+    {/* Settings Modal */}
+    {isSettingsOpen && (
+      <div className="modal-overlay" onClick={() => setIsSettingsOpen(false)}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2><Settings size={20} /> Brain Settings</h2>
+            <button className="close-btn" onClick={() => setIsSettingsOpen(false)}><X size={20} /></button>
+          </div>
+          <div className="modal-body">
+            <label>Custom Instructions (System Rules)</label>
+            <textarea
+              placeholder='e.g., "Always speak in pirate style", "Be concise", "Explain like I am 5"'
+              value={customRules}
+              onChange={(e) => setCustomRules(e.target.value)}
+              rows={6}
+            />
+            <p className="hint">These rules apply to all new messages.</p>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Mobile/Toggle Button */}
+    {!isSidebarOpen && (
+      <button
+        className="sidebar-toggle fixed"
+        onClick={() => setIsSidebarOpen(true)}
+        title="Open Sidebar"
+      >
+        <PanelLeftOpen size={20} />
+      </button>
+    )}
+
+    {/* Sidebar */}
+    <aside className={`sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
+      <div className="sidebar-header">
+        <button className="nav-item new-chat" onClick={startNewChat}>
+          <MessageSquarePlus size={18} />
+          <span>New chat</span>
+        </button>
+        <button
+          className="sidebar-toggle"
+          onClick={() => setIsSidebarOpen(false)}
+          title="Close Sidebar"
+        >
+          <PanelLeftClose size={20} />
+        </button>
+      </div>
+
+      <div className="sidebar-content">
+        <div className="nav-group">
+          <button className="nav-item">
+            <Search size={18} />
+            <span>Search chats</span>
           </button>
         </div>
 
-        <div className="sidebar-content">
-          <div className="nav-group">
-            <button className="nav-item">
-              <Search size={18} />
-              <span>Search chats</span>
+        <div className="nav-group-header">Assistants</div>
+        <div className="nav-group">
+          {[
+            { id: "normal", icon: Bot, label: "Normal Chat" },
+            { id: "coding", icon: Code2, label: "Coding Chat" },
+            { id: "idea", icon: Lightbulb, label: "Idea Chat" },
+            { id: "placement", icon: Briefcase, label: "Placement Chat" }
+          ].map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${mode === item.id ? "active" : ""}`}
+              onClick={() => setMode(item.id)}
+              style={mode === item.id ? { backgroundColor: "#2f2f2f", color: getThemeColor(item.id) } : {}}
+            >
+              <item.icon size={18} color={mode === item.id ? getThemeColor(item.id) : "currentColor"} />
+              <span>{item.label}</span>
             </button>
-          </div>
-
-          <div className="nav-group-header">Assistants</div>
-          <div className="nav-group">
-            {[
-              { id: "normal", icon: Bot, label: "Normal Chat" },
-              { id: "coding", icon: Code2, label: "Coding Chat" },
-              { id: "idea", icon: Lightbulb, label: "Idea Chat" },
-              { id: "placement", icon: Briefcase, label: "Placement Chat" }
-            ].map((item) => (
-              <button
-                key={item.id}
-                className={`nav-item ${mode === item.id ? "active" : ""}`}
-                onClick={() => setMode(item.id)}
-                style={mode === item.id ? { backgroundColor: "#2f2f2f", color: getThemeColor(item.id) } : {}}
-              >
-                <item.icon size={18} color={mode === item.id ? getThemeColor(item.id) : "currentColor"} />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="nav-group-header">Your Chats</div>
-          <div className="nav-group history-list">
-            {chats.length === 0 ? (
-              <div style={{ padding: "0.5rem 0.75rem", color: "#666", fontSize: "0.85rem" }}>
-                No history yet.
-              </div>
-            ) : (
-              chats.map((c) => (
-                <button
-                  key={c._id}
-                  className={`nav-item history-item ${currentChatId === c._id ? "active" : ""}`}
-                  onClick={() => loadChat(c._id)}
-                  onContextMenu={(e) => handleContextMenu(e, c._id)}
-                >
-                  <span className="history-title">{c.title}</span>
-                </button>
-              ))
-            )}
-          </div>
+          ))}
         </div>
 
-        <div className="sidebar-footer">
-          {isProfileOpen && (
-            <div className="profile-menu">
-              <button className="menu-item" onClick={() => { setIsSettingsOpen(true); setIsProfileOpen(false); }}>
-                <Settings size={16} />
-                <span>Custom Instructions</span>
-              </button>
-              <button className="menu-item" onClick={logout}>
-                <LogOut size={16} />
-                <span>Log out</span>
-              </button>
-            </div>
-          )}
-          <button
-            className="nav-item user-profile"
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-          >
-            <div className="user-avatar-sm">
-              {user && user.username ? user.username.charAt(0).toUpperCase() : <User size={16} />}
-            </div>
-            <div className="user-info">
-              <span className="user-name">{user && user.username ? user.username : "User"}</span>
-              <span className="user-plan">Free Plan</span>
-            </div>
-          </button>
-        </div>
-      </aside>
-
-      <main className="chat-area">
-        <div className="messages-container">
-          {chat.length === 0 ? (
-            <div className="welcome-screen">
-              <div className="logo-large" style={{ color: themeColor }}>
-                {mode === "coding" && <Code2 size={48} />}
-                {mode === "idea" && <Lightbulb size={48} />}
-                {mode === "placement" && <Briefcase size={48} />}
-                {mode === "normal" && <Sparkles size={48} />}
-              </div>
-              <h1>How can I help you with {mode === "normal" ? "anything" : mode}?</h1>
+        <div className="nav-group-header">Your Chats</div>
+        <div className="nav-group history-list">
+          {chats.length === 0 ? (
+            <div style={{ padding: "0.5rem 0.75rem", color: "#666", fontSize: "0.85rem" }}>
+              No history yet.
             </div>
           ) : (
-            chat.map((c, i) => (
-              <div key={i} className={`message ${c.role}`}>
-                <div className="message-avatar">
-                  {c.role === "user" ? (
-                    <User size={20} />
-                  ) : (
-                    <Bot size={20} color={themeColor} />
-                  )}
-                </div>
-                <div className="message-content">
-                  {c.image ? (
-                    <div className="image-result">
-                      <img src={c.image} alt="Generated Art" />
-                    </div>
-                  ) : c.file ? (
-                    <div className="file-display">
-                      {c.file.type === "image" && c.file.url && <img src={c.file.url} alt={c.file.name} />}
-                      <p>Attached: {c.file.name}</p>
-                      {c.text && (
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{ code: CodeBlock }}
-                        >
-                          {c.text}
-                        </ReactMarkdown>
-                      )}
-                    </div>
-                  ) : (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{ code: CodeBlock }}
-                    >
-                      {c.text}
-                    </ReactMarkdown>
-                  )}
-                </div>
-              </div>
+            chats.map((c) => (
+              <button
+                key={c._id}
+                className={`nav-item history-item ${currentChatId === c._id ? "active" : ""}`}
+                onClick={() => loadChat(c._id)}
+                onContextMenu={(e) => handleContextMenu(e, c._id)}
+              >
+                <span className="history-title">{c.title}</span>
+              </button>
             ))
           )}
-          <div ref={bottomRef} />
         </div>
+      </div>
 
-        <div className="input-area">
-          {/* File Preview */}
-          {file && (
-            <div className="file-preview">
-              <span className="file-name">{file.name}</span>
-              <button className="remove-file" onClick={removeFile}><X size={14} /></button>
+      <div className="sidebar-footer">
+        {isProfileOpen && (
+          <div className="profile-menu">
+            <button className="menu-item" onClick={() => { setIsSettingsOpen(true); setIsProfileOpen(false); }}>
+              <Settings size={16} />
+              <span>Custom Instructions</span>
+            </button>
+            <button className="menu-item" onClick={logout}>
+              <LogOut size={16} />
+              <span>Log out</span>
+            </button>
+          </div>
+        )}
+        <button
+          className="nav-item user-profile"
+          onClick={() => setIsProfileOpen(!isProfileOpen)}
+        >
+          <div className="user-avatar-sm">
+            {user && user.username ? user.username.charAt(0).toUpperCase() : <User size={16} />}
+          </div>
+          <div className="user-info">
+            <span className="user-name">{user && user.username ? user.username : "User"}</span>
+            <span className="user-plan">Free Plan</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <main className="chat-area">
+      <div className="messages-container">
+        {chat.length === 0 ? (
+          <div className="welcome-screen">
+            <div className="logo-large" style={{ color: themeColor }}>
+              {mode === "coding" && <Code2 size={48} />}
+              {mode === "idea" && <Lightbulb size={48} />}
+              {mode === "placement" && <Briefcase size={48} />}
+              {mode === "normal" && <Sparkles size={48} />}
             </div>
-          )}
-
-          <div className="input-container" style={{ borderColor: isSidebarOpen ? "" : themeColor }}>
-            <label className="attach-btn" title="Upload Document or Image">
-              <Paperclip size={20} />
-              <input type="file" onChange={handleFileChange} style={{ display: "none" }} />
-            </label>
-            <input
-              className="chat-input"
-              value={msg}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              onChange={(e) => setMsg(e.target.value)}
-              placeholder={isListening ? "Listening..." : (file ? "Ask about this file..." : `Message ${mode} assistant...`)}
-            />
-            {/* Voice Button */}
-            <button
-              className="attach-btn"
-              onClick={toggleListening}
-              style={{ color: isListening ? "#ff4b4b" : "#aaa", marginRight: "8px" }}
-              title="Voice Input"
-            >
-              <Mic size={20} />
-            </button>
-            {/* TTS Toggle Button */}
-            <button
-              className="attach-btn"
-              onClick={() => {
-                const newState = !isTTSActive;
-                if (!newState) window.speechSynthesis.cancel();
-                setIsTTSActive(newState);
-              }}
-              style={{ color: isTTSActive ? themeColor : "#aaa", marginRight: "8px" }}
-              title={isTTSActive ? "Mute Voice" : "Enable Voice"}
-            >
-              {isTTSActive ? <Volume2 size={20} /> : <VolumeX size={20} />}
-            </button>
-
-            <button
-              className="send-btn"
-              onClick={send}
-              disabled={(!msg.trim() && !file) || isUploading}
-              style={{ backgroundColor: themeColor }}
-            >
-              {isUploading ? "..." : "➤"}
-            </button>
+            <h1>How can I help you with {mode === "normal" ? "anything" : mode}?</h1>
           </div>
-          <div className="footer-text">
-            Imman-GPT can make mistakes. Check important info.
+        ) : (
+          chat.map((c, i) => (
+            <div key={i} className={`message ${c.role}`}>
+              <div className="message-avatar">
+                {c.role === "user" ? (
+                  <User size={20} />
+                ) : (
+                  <Bot size={20} color={themeColor} />
+                )}
+              </div>
+              <div className="message-content">
+                {c.image ? (
+                  <div className="image-result">
+                    <img src={c.image} alt="Generated Art" />
+                  </div>
+                ) : c.file ? (
+                  <div className="file-display">
+                    {c.file.type === "image" && c.file.url && <img src={c.file.url} alt={c.file.name} />}
+                    <p>Attached: {c.file.name}</p>
+                    {c.text && (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{ code: CodeBlock }}
+                      >
+                        {c.text}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                ) : (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{ code: CodeBlock }}
+                  >
+                    {c.text}
+                  </ReactMarkdown>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="input-area">
+        {/* File Preview */}
+        {file && (
+          <div className="file-preview">
+            <span className="file-name">{file.name}</span>
+            <button className="remove-file" onClick={removeFile}><X size={14} /></button>
           </div>
+        )}
+
+        <div className="input-container" style={{ borderColor: isSidebarOpen ? "" : themeColor }}>
+          <label className="attach-btn" title="Upload Document or Image">
+            <Paperclip size={20} />
+            <input type="file" onChange={handleFileChange} style={{ display: "none" }} />
+          </label>
+          <input
+            className="chat-input"
+            value={msg}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            onChange={(e) => setMsg(e.target.value)}
+            placeholder={isListening ? "Listening..." : (file ? "Ask about this file..." : `Message ${mode} assistant...`)}
+          />
+          {/* Voice Button */}
+          <button
+            className="attach-btn"
+            onClick={toggleListening}
+            style={{ color: isListening ? "#ff4b4b" : "#aaa", marginRight: "8px" }}
+            title="Voice Input"
+          >
+            <Mic size={20} />
+          </button>
+          {/* TTS Toggle Button */}
+          <button
+            className="attach-btn"
+            onClick={() => {
+              const newState = !isTTSActive;
+              if (!newState) window.speechSynthesis.cancel();
+              setIsTTSActive(newState);
+            }}
+            style={{ color: isTTSActive ? themeColor : "#aaa", marginRight: "8px" }}
+            title={isTTSActive ? "Mute Voice" : "Enable Voice"}
+          >
+            {isTTSActive ? <Volume2 size={20} /> : <VolumeX size={20} />}
+          </button>
+
+          <button
+            className="send-btn"
+            onClick={send}
+            disabled={(!msg.trim() && !file) || isUploading}
+            style={{ backgroundColor: themeColor }}
+          >
+            {isUploading ? "..." : "➤"}
+          </button>
         </div>
-      </main>
-    </div>
-  );
+        <div className="footer-text">
+          Imman-GPT can make mistakes. Check important info.
+        </div>
+      </div>
+    </main>
+  </div>
+);
 }
