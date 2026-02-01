@@ -427,7 +427,9 @@ export default function App() {
         }
         return newChat;
       });
-    } setIsUploading(false);
+    } finally {
+      setIsUploading(false);
+    }
   }
 }
 
